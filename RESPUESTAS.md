@@ -122,3 +122,29 @@ consulta = consulta.Where(o => o.FechaApertura < hasta.Value.Date.AddDays(1));
 Lo arreglé ahí y no en el frontend porque el endpoint es el que debe garantizar el comportamiento correcto para cualquiera que lo consuma, no solo esta pantalla. Si lo resuelvo mandando la hora desde el frontend, cualquier otro consumidor del endpoint vuelve a pisar el mismo bug.
 
 Para que no vuelva a pasar: agregaría un test con una operación abierta tarde en el día límite y validando que el filtro sí la trae. Es justo el caso borde que no se nota probando con fechas "redondas".
+
+Ejercicio 3 — Análisis del caso
+
+1. ¿Qué está pasando?
+
+Con la operación OP-2024-000418 el listado da 3.180.000 y el detalle da 13.557.600, ahí hay una diferencia grande. Mirando el código encontré que no es un solo problema, son tres cosas juntas:
+
+- El backend usa la TRM que quedó guardada cuando se abrió la operación (o pone 1 si nunca se guardó, que es justo lo que pasa acá). El frontend en cambio usa la TRM de hoy, sin fijarse en cuándo se registró cada costo. O sea que están usando dos tasas totalmente distintas para lo mismo.
+- Cada costo ya trae su propio valor_cop guardado, pero ni el backend ni el frontend lo usan, los dos vuelven a calcular todo desde cero con una sola tasa.
+- Cuando la operación tiene costos en más de una moneda extranjera (encontré el caso de OP-2025-003310 con EUR y USD mezclados), los dos lados le aplican la misma tasa a las dos monedas como si fueran iguales.
+
+Por eso el ticket dice que con operaciones solo en pesos nunca pasó, ahí no entra en juego ninguna conversión.
+
+2. ¿Cuál de los dos números es el correcto?
+
+Ninguno de los dos. Sumé los valor_cop que ya estaban guardados por cada costo de esa operación y da 13.742.760, un número distinto a los dos que ve el usuario. Ese me parece el más confiable porque se calculó al momento de registrar cada costo, con la tasa de ese día, no con una tasa global aplicada después. De todas formas lo confirmaría con negocio antes de darlo por hecho.
+
+3. ¿Qué le preguntaría al área de negocio?
+
+- Cómo se calcula el valor cuando se guarda un costo y con qué tasa. Si es la oficial del día que se registró, ese campo debería ser el que se use en los dos lados, y ya no habría que recalcular nada.
+- Qué se espera que pase cuando una operación no tiene TRM capturada, como esta. Hoy queda en 1 por default y eso no representa nada real.
+- Si el total del listado tiene que ser siempre igual al del detalle, o si a propósito pueden mostrar cosas distintas (por ejemplo uno el valor histórico y el otro el actualizado a hoy). Si tienen que ser iguales, la solución es usar la misma fuente en los dos. Si no, hay que dejarlo claro en la pantalla.
+
+4. ¿Cómo lo arreglaría?
+
+Haría que el listado y el detalle sumen directo los valor_cop que ya están guardados por costo, en vez de que cada uno recalcule con su propia TRM. Con eso se resuelven las tres causas de una vez: ya no importa si la TRM de apertura y la de hoy son distintas, se respeta lo que se guardó por costo en su momento, y no depende de una sola tasa que no distingue entre USD y EUR. El cambio iría en CalcularTotalCop, que dejaría de necesitar la TRM, y en el componente de detalle, que dejaría de usar trmHoy para esto. Antes de tocarlo confirmaría con negocio si el valor_cop es realmente el dato bueno, según lo que pregunté en el punto 1.
