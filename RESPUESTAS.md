@@ -63,3 +63,30 @@ ORDER BY o.fecha_apertura DESC;
 
 Acá sí se ve la diferencia: `type` pasa de `ALL` a `range`, `key` ya no es NULL, y en `Extra` desapareció el `Using filesort` — aparece `Backward index scan`, que es MySQL 8 recorriendo el índice al revés para servir el `ORDER BY DESC` sin tener que ordenar aparte. Esto confirma que el índice sí ayuda cuando se usa, solo que con 800 filas el optimizador prefiere el full scan por su cuenta. En una tabla más grande no haría falta forzarlo.
 
+2.1 Filtro por estado y paginación en el endpoint
+
+Se agrego en el controlador de las operaciones paginación, con 3 condiciones basicas para el correcto funcionamiento y en caso que no vengan las variables.
+
+if (page < 1) page = 1;
+if (pageSize < 1) pageSize = 20;
+if (pageSize > 100) pageSize = 100;
+
+Con el conector, se agegan los parametros
+
+public int Page { get; set; }
+public int PageSize { get; set; }
+
+y se agrega el filtro como query param de estado 
+
+if (!string.IsNullOrWhiteSpace(estado))
+    consulta = consulta.Where(o => o.Estado == estado);
+
+Por ultimo, se devuelve la cantidad de objetos por pagina, la pagina actual en el response
+
+return Ok(new OperacionListResponse
+        {
+            Items = items,
+            Total = total,
+            Page = page,
+            PageSize = pageSize
+        });
