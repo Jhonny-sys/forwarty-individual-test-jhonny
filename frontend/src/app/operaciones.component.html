@@ -1,0 +1,73 @@
+<section class="panel">
+  <header>
+    <h1>Operaciones</h1>
+    <p class="sub">Forwarty — prueba técnica</p>
+  </header>
+
+  <form class="filtros" (ngSubmit)="buscar()">
+    <label>
+      Desde
+      <input type="date" name="desde" [(ngModel)]="desde" />
+    </label>
+
+    <label>
+      Hasta
+      <input type="date" name="hasta" [(ngModel)]="hasta" />
+    </label>
+
+    <!-- TODO: aquí va el filtro por estado -->
+
+    <button type="submit" [disabled]="cargando()">Buscar</button>
+  </form>
+
+  @if (cargando()) {
+    <p class="aviso">Cargando…</p>
+  }
+
+  @if (error()) {
+    <p class="error">{{ error() }}</p>
+  }
+
+  @if (!cargando() && !error()) {
+    <p class="resumen">{{ total() }} operaciones</p>
+
+    <div class="tabla-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Operación</th>
+            <th>Cliente</th>
+            <th>Tipo</th>
+            <th>Estado</th>
+            <th>Apertura</th>
+            <th class="num">Costos</th>
+            <th class="num">Total COP</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (op of operaciones(); track op.id) {
+            <tr>
+              <td>{{ op.numeroOperacion }}</td>
+              <td>{{ op.clienteRazonSocial }}</td>
+              <td>{{ op.tipo }}</td>
+              <td><span class="badge">{{ op.estado }}</span></td>
+              <td>{{ op.fechaApertura | date: 'dd/MM/yyyy HH:mm' }}</td>
+              <td class="num">{{ op.cantidadCostos }}</td>
+              <td class="num">{{ op.totalCop | number: '1.0-0' }}</td>
+            </tr>
+          } @empty {
+            <tr><td colspan="7" class="vacio">Sin resultados para estos filtros.</td></tr>
+          }
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="6">Total de lo que se ve en pantalla</td>
+            <td class="num">{{ totalPagina() | number: '1.0-0' }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- TODO: aquí van los controles de paginación -->
+  }
+</section>

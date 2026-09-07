@@ -1,0 +1,23 @@
+name: forwarty-prueba
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: forwarty-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: forwarty
+      MYSQL_DATABASE: forwarty
+    ports:
+      - "3306:3306"
+    volumes:
+      # Se montan los dos archivos uno por uno, y no la carpeta entera, para que
+      # lo que escribas en db/RESPUESTAS.sql no se ejecute al levantar la base.
+      # MySQL los corre en orden alfabético la primera vez que arranca.
+      - ./db/01_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./db/02_datos.sql:/docker-entrypoint-initdb.d/02_datos.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-pforwarty"]
+      interval: 5s
+      timeout: 5s
+      retries: 20

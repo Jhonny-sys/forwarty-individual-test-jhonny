@@ -1,0 +1,16 @@
+# .NET
+bin/
+obj/
+*.user
+
+# Node / Angular
+node_modules/
+dist/
+.angular/
+
+# Editores
+.vs/
+.vscode/
+.idea/
+*.swp
+.DS_Store
