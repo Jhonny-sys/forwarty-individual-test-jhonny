@@ -15,7 +15,15 @@
       <input type="date" name="hasta" [(ngModel)]="hasta" />
     </label>
 
-    <!-- TODO: aquí va el filtro por estado -->
+    <label>
+      Estado
+      <select name="estado" [(ngModel)]="estado">
+        <option value="">Todos</option>
+        @for (e of estadosDisponibles(); track e) {
+          <option [value]="e">{{ e }}</option>
+        }
+      </select>
+    </label>
 
     <button type="submit" [disabled]="cargando()">Buscar</button>
   </form>
@@ -68,6 +76,18 @@
       </table>
     </div>
 
-    <!-- TODO: aquí van los controles de paginación -->
+    <div class="paginacion">
+      <button type="button" (click)="paginaAnterior()" [disabled]="pagina() <= 1">
+        Anterior
+      </button>
+
+      <span class="pagina-info">
+        Página {{ pagina() }} de {{ totalPaginas() }}
+      </span>
+
+      <button type="button" (click)="paginaSiguiente()" [disabled]="pagina() >= totalPaginas()">
+        Siguiente
+      </button>
+    </div>
   }
 </section>

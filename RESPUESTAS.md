@@ -84,9 +84,29 @@ if (!string.IsNullOrWhiteSpace(estado))
 Por ultimo, se devuelve la cantidad de objetos por pagina, la pagina actual en el response
 
 return Ok(new OperacionListResponse
-        {
-            Items = items,
-            Total = total,
-            Page = page,
-            PageSize = pageSize
-        });
+{
+    Items = items,
+    Total = total,
+    Page = page,
+    PageSize = pageSize
+});
+
+2.2 Conectarlo en la pantalla
+
+Para el selector de estado, se agregó un signal estadosDisponibles que se llena al iniciar el componente (ngOnInit) llamando al endpoint /api/operaciones/estados que ya existía. Si esa llamada falla, no se bloquea el listado principal, el selector simplemente queda solo con la opción "Todos" y las operaciones se siguen cargando igual.
+
+En el modelo (operaciones.model.ts) se agregó estado, page y pageSize al FiltroOperaciones, y page/pageSize al OperacionListResponse para que coincida con lo que ya devuelve el backend. En el servicio se agregaron esos mismos parámetros al HttpParams, solo si vienen definidos, igual que ya se hacía con desde y hasta.
+
+Para la paginación se separó la lógica en dos métodos en el componente:
+
+- buscar(): se dispara con el submit del formulario de filtros. Siempre resetea la página a 1 antes de cargar, porque si estoy en la página 5 y cambio el filtro de estado no tiene sentido quedarme ahí, ese resultado nuevo puede ni tener 5 páginas.
+- cargar(): es el que realmente llama al servicio. Lo reutilizan tanto buscar() como los botones de anterior/siguiente, así no se duplica la llamada HTTP en dos lugares distintos.
+
+El total de páginas se calcula con un computed a partir del total que devuelve el backend (el que ya viene filtrado) y el pageSize fijo de 20, no a partir de operaciones().length, porque eso solo contaría lo que trae la página actual y totalPaginas siempre daría 1.
+
+Cuando el selector de estado está en "Todos" (value vacío), se manda undefined al servicio en vez de un string vacío, para que el HttpParams no agregue estado= vacío a la URL.
+
+Para que la pantalla no quede en un estado raro:
+- Mientras cargando() es true, se oculta toda la sección de tabla y paginación (el @if ya existente lo cubre), así los botones de paginación no quedan clickeables mientras hay una petición en curso.
+- El @empty del @for que ya estaba en el template cubre el caso de "sin resultados para estos filtros".
+- Los botones de Anterior y Siguiente se deshabilitan solos cuando estoy en la primera o última página (pagina() <= 1 y pagina() >= totalPaginas()).

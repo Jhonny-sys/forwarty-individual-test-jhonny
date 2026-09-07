@@ -12,6 +12,9 @@ export class OperacionesService {
 
     if (filtro.desde) params = params.set('desde', filtro.desde);
     if (filtro.hasta) params = params.set('hasta', filtro.hasta);
+    if (filtro.estado) params = params.set('estado', filtro.estado);
+    if (filtro.page) params = params.set('page', filtro.page);
+    if (filtro.pageSize) params = params.set('pageSize', filtro.pageSize);
 
     return this.http.get<OperacionListResponse>('/api/operaciones', { params });
   }
