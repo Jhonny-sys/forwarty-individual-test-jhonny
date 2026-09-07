@@ -1,0 +1,65 @@
+En este documento especifico cada una de mis respuesta junto con la ejecución de cada paso para la resolución el mismo.
+
+1.1 Operaciones de un cliente con su total
+
+SELECT
+    o.numero_operacion,
+    o.estado,
+    o.fecha_apertura,
+    COALESCE(SUM(c.valor_cop), 0) AS total_cop
+FROM operaciones o
+LEFT JOIN costos c ON c.operacion_id = o.id
+WHERE o.cliente_id = 21
+GROUP BY o.id, o.numero_operacion, o.estado, o.fecha_apertura
+ORDER BY o.fecha_apertura DESC;
+
+En la consulta traemos las operaciones del cliente id 21, con un left join a costos para que me traiga los valores de operaciones aunque no tenga costos, ordenado por fecha de apertura descendiente
+
+1.2 Los cinco clientes que más facturan
+
+SELECT
+    cl.razon_social,
+    COUNT(DISTINCT o.id) AS operaciones,
+    COALESCE(SUM(c.valor_cop), 0) AS total_facturable
+FROM clientes cl
+JOIN operaciones o ON o.cliente_id = cl.id
+LEFT JOIN costos c ON c.operacion_id = o.id AND c.facturable = 1
+WHERE o.estado NOT IN ('CERRADA', 'ANULADA')
+  AND o.fecha_apertura >= '2025-01-01'
+  AND o.fecha_apertura <  '2026-01-01'
+GROUP BY cl.id, cl.razon_social
+ORDER BY total_facturable DESC
+LIMIT 5;
+
+La consulta se aplica sobre clientes, haciendo un join con las operaciones al ser obligatorio que haya facturadp, haciendo otro left join con costos, ya que si tiene una opreación, esta puede venir vacia, priorizando la opreación en la consulta, pero agregando la condicion sobre el join, asi optimizando la consulta para traer los datos y no aplicar una condicion where mas exigente, se toma un tando de fechas para calcular el año y que no esten cerradas ni anuladas y se limita a 5 para obtener los 5 clientes que mas facturan en orden descendete por total.
+
+## 1.3 — Índice
+
+**Índice propuesto:**
+```sql
+CREATE INDEX idx_operaciones_fecha_apertura ON operaciones (fecha_apertura);
+```
+
+**EXPLAIN antes del índice:**
+
+| id | select_type | table | type | possible_keys | key  | rows | filtered | Extra                          |
+|----|-------------|-------|------|----------------|------|------|----------|---------------------------------|
+| 1  | SIMPLE      | o     | ALL  | NULL           | NULL | 800  | 11.11    | Using where; Using filesort    |
+
+**EXPLAIN después del índice:**
+
+| id | select_type | table | type | possible_keys                  | key  | rows | filtered | Extra                          |
+|----|-------------|-------|------|----------------------------------|------|------|----------|---------------------------------|
+| 1  | SIMPLE      | o     | ALL  | idx_operaciones_fecha_apertura  | NULL | 800  | 30.00    | Using where; Using filesort    |
+
+**Análisis:** el índice se creó bien, MySQL lo reconoce (sale en `possible_keys`), pero al final no lo usó — `key` sigue en NULL y el plan sigue siendo `ALL` con filesort en los dos casos.
+
+Tiene sentido: con solo 800 filas y un rango que trae como el 30% de la tabla, para MySQL es más barato hacer un scan completo que ponerse a saltar entre el índice y la tabla fila por fila. Eso no significa que el índice esté de más — con las "cientos de miles" de operaciones que menciona el enunciado para producción, ahí sí lo tomaría, porque el rango sería una porción mucho más chica del total. Si quisiera comprobarlo ya, sin esperar a que la tabla crezca, podría forzar su uso con `FORCE INDEX`.
+
+EXPLAIN SELECT o.id, o.numero_operacion, o.fecha_apertura
+FROM operaciones o FORCE INDEX (idx_operaciones_fecha_apertura)
+WHERE o.fecha_apertura >= '2025-01-01' AND o.fecha_apertura < '2025-04-01'
+ORDER BY o.fecha_apertura DESC;
+
+Acá sí se ve la diferencia: `type` pasa de `ALL` a `range`, `key` ya no es NULL, y en `Extra` desapareció el `Using filesort` — aparece `Backward index scan`, que es MySQL 8 recorriendo el índice al revés para servir el `ORDER BY DESC` sin tener que ordenar aparte. Esto confirma que el índice sí ayuda cuando se usa, solo que con 800 filas el optimizador prefiere el full scan por su cuenta. En una tabla más grande no haría falta forzarlo.
+
