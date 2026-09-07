@@ -38,7 +38,7 @@ public class OperacionesController : ControllerBase
             consulta = consulta.Where(o => o.FechaApertura >= desde.Value);
 
         if (hasta.HasValue)
-            consulta = consulta.Where(o => o.FechaApertura <= hasta.Value);
+            consulta = consulta.Where(o => o.FechaApertura < hasta.Value.Date.AddDays(1));
 
         if (!string.IsNullOrWhiteSpace(estado))
             consulta = consulta.Where(o => o.Estado == estado);

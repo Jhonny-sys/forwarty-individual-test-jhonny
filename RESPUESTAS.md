@@ -110,3 +110,15 @@ Para que la pantalla no quede en un estado raro:
 - Mientras cargando() es true, se oculta toda la sección de tabla y paginación (el @if ya existente lo cubre), así los botones de paginación no quedan clickeables mientras hay una petición en curso.
 - El @empty del @for que ya estaba en el template cubre el caso de "sin resultados para estos filtros".
 - Los botones de Anterior y Siguiente se deshabilitan solos cuando estoy en la primera o última página (pagina() <= 1 y pagina() >= totalPaginas()).
+
+2.3 El bug
+
+Qué estaba mal: el filtro de hasta comparaba con "<= hasta.Value", pero hasta llega sin hora (00:00:00) y fecha_apertura sí tiene hora. Entonces "hasta=2025-03-31" en realidad cortaba justo a la medianoche del 31, no al final del día. Por eso OP-2025-00196, abierta esa misma tarde, quedaba fuera del rango.
+
+Dónde lo arreglé: en el backend, cambiando la condición a que traiga todo lo que sea menor al día siguiente:
+
+consulta = consulta.Where(o => o.FechaApertura < hasta.Value.Date.AddDays(1));
+
+Lo arreglé ahí y no en el frontend porque el endpoint es el que debe garantizar el comportamiento correcto para cualquiera que lo consuma, no solo esta pantalla. Si lo resuelvo mandando la hora desde el frontend, cualquier otro consumidor del endpoint vuelve a pisar el mismo bug.
+
+Para que no vuelva a pasar: agregaría un test con una operación abierta tarde en el día límite y validando que el filtro sí la trae. Es justo el caso borde que no se nota probando con fechas "redondas".
