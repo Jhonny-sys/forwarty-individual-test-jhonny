@@ -24,4 +24,6 @@ public class OperacionListResponse
 
     /// <summary>Cantidad de operaciones que cumplen los filtros.</summary>
     public int Total { get; set; }
+    public int Page { get; set; }
+    public int PageSize { get; set; }
 }

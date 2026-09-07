@@ -21,8 +21,17 @@ public class OperacionesController : ControllerBase
     public async Task<ActionResult<OperacionListResponse>> Get(
         [FromQuery] DateTime? desde,
         [FromQuery] DateTime? hasta,
+        [FromQuery] string? estado,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
         CancellationToken ct = default)
     {
+        // Bordes de paginación: nunca dejar que page o pageSize lleguen
+        // en valores que rompan el Skip/Take.
+        if (page < 1) page = 1;
+        if (pageSize < 1) pageSize = 20;
+        if (pageSize > 100) pageSize = 100;
+
         var consulta = _db.Operaciones.AsNoTracking().AsQueryable();
 
         if (desde.HasValue)
@@ -31,8 +40,17 @@ public class OperacionesController : ControllerBase
         if (hasta.HasValue)
             consulta = consulta.Where(o => o.FechaApertura <= hasta.Value);
 
+        if (!string.IsNullOrWhiteSpace(estado))
+            consulta = consulta.Where(o => o.Estado == estado);
+
+        // Total real de filas que cumplen los filtros, ANTES de paginar.
+        // El frontend lo necesita para calcular cuántas páginas hay.
+        var total = await consulta.CountAsync(ct);
+
         var items = await consulta
             .OrderByDescending(o => o.FechaApertura)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(o => new OperacionListItemDto
             {
                 Id = o.Id,
@@ -50,7 +68,9 @@ public class OperacionesController : ControllerBase
         return Ok(new OperacionListResponse
         {
             Items = items,
-            Total = items.Count
+            Total = total,
+            Page = page,
+            PageSize = pageSize
         });
     }
 
